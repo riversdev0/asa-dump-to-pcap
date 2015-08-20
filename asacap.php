@@ -32,6 +32,9 @@ $http_path = "/asa-dump-to-pcap/";
 // the maximum number of characters that the textarea will accept.
 $max_chars = 500000;
 
+// save the input hex data to a text file in case any troubleshooting is needed
+$save_input = 0;
+
 //
 // START OF SCRIPT -- DON'T MODIFY STUFF PAST THIS POINT
 //
@@ -44,6 +47,17 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
     if (strlen($_POST['capbytes']) > $max_chars) {
       die ("The textarea only accepts ".number_format($max_chars)." characters. Please submit a smaller section of capture, or modify the script to accomodate more.");
     }
+
+    // save the input text for reference
+    if ($save_input > 0) {
+      $fname = date("Md-His").".txt";
+      $handle = fopen($local_path.$fname,"x") or die("Could not open the output folder to write the file.");
+      fwrite($handle,$_POST['capbytes']);
+      fclose($handle);
+      unset($handle);
+    }
+
+    // start the interpretation
     $capture_lines = explode("\r\n",$_POST['capbytes']);
 
     if ($debug>0) {
@@ -75,6 +89,12 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
       // if ($debug>0) { echo "line number: {$line_counter}<br />\nbyte_counter: {$byte_counter}<br />\n"; }
       // if we have a blank line, then ingore the line
       if (strlen($this_line) == 0) {
+      }
+      // if we have the '<--more-->' characters, then ignore the line
+      elseif (substr($this_line,0,14)=="<--- More --->") {
+      }
+      // if we have 14 space characters, then ignore the line
+      elseif (substr($this_line,0,14)=="              ") {
       }
       // if we have a hash within 20 or so characters, then ignore the line
       elseif (preg_match("/#/",substr($this_line,0,20))) {
@@ -116,16 +136,23 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
         $header .= pack("N",$microseconds);
       }
       // if we have a 0x as the first two characters, then we have packet data
-      elseif (substr($this_line,0,2)=="0x") {
-        $bytes = explode(" ",substr($this_line,9,39));
+      elseif (substr($this_line,0,2) == "0x") {
+        $bytes = explode(" ",$this_line);
         if ($debug>0) { print_r($bytes); }
+        // remove all the words past number 9
+        array_splice($bytes, 9);
+        // remove the first word because it's always 0xNNNN
+        unset($bytes[0]);
         foreach ($bytes as $short) {
           if (strlen($short) == 2) {
             $byte_counter++;
             $data .= pack("H*",$short);
-          } elseif (strlen($short)==4) {
+          } elseif (strlen($short) == 4) {
             $byte_counter+=2;
             $data .= pack("H*",$short);
+          } elseif (strlen($short) > 4) {
+            $byte_counter+=2;
+            $data .= pack("H*",substr($short,0,4));
           }
         }
       }
