@@ -33,7 +33,7 @@ $http_path = "/asa-dump-to-pcap/";
 $max_chars = 500000;
 
 // save the input hex data to a text file in case any troubleshooting is needed
-$save_input = 0;
+$save_input = 1;
 
 //
 // START OF SCRIPT -- DON'T MODIFY STUFF PAST THIS POINT
@@ -118,8 +118,7 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
         if(isset($header)&&isset($data)) {
           if ($debug>0) { echo "byte_counter is: {$byte_counter}<br />\n"; }
           // write out the previous packet data
-          $header .= pack("N",$byte_counter);
-          $header .= pack("N",$byte_counter);
+          $header .= pack("N",$byte_counter) . pack("N",$byte_counter);
           fwrite($handle,$header.$data);
           unset($header,$data,$byte_counter);
         } else {
@@ -137,12 +136,15 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
       }
       // if we have a 0x as the first two characters, then we have packet data
       elseif (substr($this_line,0,2) == "0x") {
-        $bytes = explode(" ",$this_line);
-        if ($debug>0) { print_r($bytes); }
-        // remove all the words past number 9
-        array_splice($bytes, 9);
-        // remove the first word because it's always 0xNNNN
-        unset($bytes[0]);
+        if ($debug>0) { echo "here's what we start with: \"{$this_line}\"<br />\n"; } 
+        // whack the first 6 characters and then trim the string
+        $this_line = trim(substr($this_line,6));
+        // grab the first 39 characters and then remove whitespace
+        $this_line = preg_replace('/\s+/', '', substr($this_line,0,39));
+        if ($debug>0) { echo "here's what we have left: \"{$this_line}\"<br />\n"; } 
+        // break the line into words
+        $bytes = str_split($this_line,4);
+        if ($debug>0) { echo var_dump($bytes); }
         foreach ($bytes as $short) {
           if (strlen($short) == 2) {
             $byte_counter++;
@@ -155,6 +157,7 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
             $data .= pack("H*",substr($short,0,4));
           }
         }
+        if ($debug>0) { echo "byte_conter is: {$byte_counter}<br />\n"; }
       }
       // any other condition
       else {
@@ -164,8 +167,7 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
     // write out any data that might be left in the variables
     if(isset($header)&&isset($data)) {
       // write out the previous packet data
-      $header .= pack("N",$byte_counter);
-      $header .= pack("N",$byte_counter);
+      $header .= pack("N",$byte_counter) . pack("N",$byte_counter);
       fwrite($handle,$header.$data);
       unset($header,$data,$byte_counter);
     }
