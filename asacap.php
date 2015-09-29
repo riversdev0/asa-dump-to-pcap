@@ -106,8 +106,7 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
       elseif (substr($this_line,-13) == "packets shown") {
         if(isset($header)&&isset($data)) {
           // write out the previous packet data
-          $header .= pack("N",$byte_counter);
-          $header .= pack("N",$byte_counter);
+          $header .= pack("N",$byte_counter) . pack("N",$byte_counter);
           fwrite($handle,$header.$data);
           unset($header,$data,$byte_counter);
         }
@@ -133,6 +132,11 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
         if ($debug>0) { echo "microseconds printf: "; printf("%'06s",$microseconds); echo "\n";}
         $microseconds = sprintf("%'06s",$microseconds);
         $header .= pack("N",$microseconds);
+        if (!isset($_POST['l2header'])) {
+          if ($debug>0) { echo "L2 header is missing, so inserting an artificial header.<br />\n"; }
+          $byte_counter+=14;
+          $data .= pack("H*","1111112222223333334444440800");
+        }
       }
       // if we have a 0x as the first two characters, then we have packet data
       elseif (substr($this_line,0,2) == "0x") {
@@ -186,6 +190,7 @@ if ($_SERVER['REQUEST_METHOD']=="POST") {
     "from an ASA and converts it into a pcap file. The box below accepts ".number_format($max_chars)." characters. Paste in the output and then click ".
     "\"Submit\".<br /><br />\nWritten by riversdev0 on Aug 11, 2015.<br />This project is available on Github here: <a href=\"https://github.com/riversdev0/asa-dump-to-pcap\" target=\"_blank\">https://github.com/riversdev0/asa-dump-to-pcap</a></div>\n".
     "<div style=\"margin-bottom:15px;\"><textarea name=\"capbytes\" cols=\"95\" rows=\"26\" maxlength=\"{$max_chars}\"></textarea></div>".
+    "<div style=\"width:700;margin-bottom:15px;\"><input type=\"checkbox\" name=\"l2header\" checked=\"checked\" /> The hex dump data includes Layer 2 headers.<span style=\"font-size:.7em;\">&nbsp;&nbsp;If the resulting pcap file does not make sense in Wireshark, it might be because older ASA software does not always display the layer 2 headers in the dump data. Try unchecking this box and do the conversion again.</span></div>".
     "<input type=\"submit\" />\n".
     "</form>\n".
     "</body></html>";
